@@ -1,187 +1,221 @@
-# SPEEDEX v2 — Technical Architecture
+# SPEEDEX — Immersive Website
+## Project Architecture, Component Tree & Developer Handover
 
-## 1. Experience architecture
+**Company:** SPEEDEX — For Service & Commercial Mediation
+**Core (Primary):** Global Trade & Sourcing, China → Qatar
+**Premium complement (Secondary):** A-to-Z Corporate Setup in Qatar
+**Date / version:** 19 October 2026 · v1.0 working interactive prototype + production blueprint
 
-The site is one Next.js route whose scroll position acts as the film timeline.
+> **What you have now:** a runnable, deployable React website (`/home/user/speedex`) implementing the full story — 3D flight pre-loader, trade-first homepage, shipment planner, Blueprint→Reality corporate-setup experience, trilingual EN/AR/中文 with true RTL, and dark/light mode — **plus** the production Next.js + React Three Fiber version of the flight scene (`speedex/nextjs-reference/`) ready to lift into the App Router build described in §4.
 
-```text
-Immediate Hero: pinned canvas image sequence — scroll progress = frame index
-        ↓ Smooth + GSAP
-Gateway mission → Who We Are → asymmetric A-to-Z consultancy flow
-        ↓
-Why Choose Us → China Gateway
-        ↓
-01 Trade film (sticky, scrubbed) → services → checkpoints → planner
-        ↓
-Why Qatar? → Company Setup Services (four blank client-input slots)
-        ↓ arrival interlude
-02 Setup board + corporate film (sticky, scrubbed) → legal platforms
-        ↓
-Insights & Commercial Analysis → Why SPEEDEX → RFQ → footer
+---
+
+## 1. Creative direction — how the references were synthesised
+
+| Reference quality requested | How it is expressed in SPEEDEX |
+|---|---|
+| **“KAGE” — cinematic scroll storytelling** | One continuous journey: *flight → landing → sourcing → shipping → building a company → launch*. GSAP ScrollTrigger reveals, a full-bleed maroon depth gradient on the hero, and curtain-lift exit from the pre-loader. |
+| **“Bluebird” — clean, glassmorphic, reactive UI** | Frosted glass cards (`backdrop-filter: blur` + 1px gold hairlines), ultra-clean Space Grotesk / Inter type, elements that fly/fade in on scroll, tilt-rise hover states. |
+| **“VELA / Aviation” — luxury & scale** | Oversized display typography (`CHINA → QATAR.` at up to 138px), full-screen Doha aerial, serif italic accent line, restrained gold-on-maroon palette. |
+| **Your supplied brand assets** | The 3D dioramas of **Beijing** and **Doha**, the maroon/white SPEEDEX jet, and the 3D maroon logo are used as first-class visuals. The mark itself drives the brand story: *the Qatari gazelle of speed, leaping over the globe.* |
+
+### 1.1 Design tokens (extracted from your logo)
+
+| Token | Value | Use |
+|---|---|---|
+| `--maroon` | `#8A1538` (Qatar maroon) | Primary brand, CTAs, jet livery, tail fin |
+| `--maroon-2 / -3` | `#6E0F2B` / `#4A0A1E` | Gradient depth, marquee band, quote panel |
+| `--wine` | `#B4234A` | Highlights, progress, live accents |
+| `--gold / --gold-2` | `#C9A86A` / `#E8D5A8` | Accents, hairlines, premium CTAs, flight trail |
+| `--beige` | `#F5EFE4` | Light surfaces, fuselage white |
+| Dark bg | `#0A0508 → #160810` | Default theme (pre-loader stays dark in both themes — cinematic by design) |
+| Light bg | `#F7F2E9 → #FFFAF1` | Light theme |
+
+### 1.2 Typography (trilingual-safe stack)
+
+- **Display:** Space Grotesk → IBM Plex Sans Arabic → Noto Sans SC
+- **Body:** Inter → IBM Plex Sans Arabic → Noto Sans SC
+- **Luxury accent (italic):** Cormorant Garamond
+- Arabic uses reduced letter-spacing (Arabic script must not be tracked out); kickers switch from `.32em` to `.08em` in RTL automatically.
+
+---
+
+## 2. Information architecture & user journey
+
+The page is a **story with a hierarchy**, not a menu of equals: Trade is the hero and the first full chapter; Corporate Setup arrives second, framed as the elite complement (“now that your goods move — build the company that sells them”).
+
+```mermaid
+flowchart TD
+  A["0 · 3D PRE-LOADER<br/>SX-001: Beijing → Doha flight on a globe"] -->|"plane lands · curtain lifts"| B["1 · HERO<br/>CHINA → QATAR. Trade at the speed of ambition."]
+  B --> C["2 · PRIMARY — GLOBAL TRADE & SOURCING<br/>Beijing ↔ Doha drag-comparison · 4 core services · 5 checkpoints"]
+  C --> D["3 · INTERACTIVE SHIPMENT PLANNER<br/>Sea/Air · 5 China origins · CBM + kg sliders · indicative range"]
+  D --> E["4 · SECONDARY (PREMIUM) — CORPORATE SETUP A-TO-Z<br/>Blueprint → Reality construction · 5 stages · MOCI / QFC / QFZ"]
+  E --> F["5 · WHY SPEEDEX<br/>The gazelle over the globe · trust proof"]
+  F --> G["6 · RFQ / BRIEF FORM<br/>Trade · Setup · Both → instant reference SPX-2026-####"]
 ```
 
-There are no generic image cards, legacy template cells or flat black text boxes in the UI. Media is full-bleed: a pinned canvas sequence, split cinematic photography, or a low-opacity chapter backdrop. The emergency anti-template layer in `app/globals.css` (`.swiss-node`, `.data-meter`, `.glass-ribbon`, `.glass-ribbon-dark`, `.glass-chip`, `.platform-ribbon`, `.editorial-row`, `.setup-placeholder`) replaces enclosed grids with staggered open nodes and floating polygon-clipped glass over deep maroon and obsidian gradients. Oversized outlined indices, one-sided hairlines, backdrop blur, internal highlights, signal bars and scroll-built meter fills carry the hierarchy. Numeric `[data-count]` readouts, gateway telemetry, pointer glare and the planner volume simulator make the data layer interactive without returning to enclosed dashboard cards.
+### Global chrome
+- Glass fixed nav: gazelle mark, anchors, **↺ Replay flight**, language pill (EN / عربي / 中文), **☀/🌙 theme toggle**, “Get a quote”.
+- Language, theme persist in `localStorage` (`spx-lang`, `spx-theme`). Arabic flips `document.dir = rtl` — layout, sliders and the compare divider are built with logical properties (`inset-inline-start`, `start/end`) so they mirror correctly.
 
-## 2. Rendering model
+---
 
-| Layer | Implementation |
-|---|---|
-| Server shell | `app/layout.tsx` and `app/page.tsx` render metadata, fonts and the client experience shell. The route is statically prerendered. |
-| Client experience | `components/Experience.tsx` owns language, theme, Smooth lifecycle and global GSAP reveals/parallax; it starts immediately with no loading gate. |
-| Images | `next/image` serves responsive AVIF/WebP derivatives of the three real city photographs. |
-| Hero sequence | `Hero.tsx` renders a fullscreen HTML5 `<canvas>` from 202 local WebP files in `public/assets/frames/`. They are quality-84 derivatives of the 202 root PNGs in `https://github.com/ir44747-stack/speedex` (commit `8f60ad3`); source PNG total ≈89.22 MiB, deployed WebP total 7.91 MiB, each frame 1024×576. |
-| Motion safety | `prefers-reduced-motion` disables Smooth and the hero pin/scrub sequence and prevents decorative GSAP states from hiding content. |
+## 3. What is implemented in this prototype (file map)
 
-Current production route output: `/` is static, 94.7 kB route size and 197 kB first-load JS at the time of handover.
+```
+speedex/
+├── index.html                      # fonts (EN/AR/ZH), title, meta, favicon = gazelle mark
+├── vite.config.ts                  # React + Tailwind v4, host 0.0.0.0:5173
+├── public/assets/                  # YOUR images, cropped/optimised (see §8.2)
+│   ├── beijing.jpg  doha-aerial.jpg  doha-waterfront.jpg
+│   ├── speedex-jet.jpg  logo-full.jpg  gazelle-globe.jpg  wordmark.jpg
+├── src/
+│   ├── main.tsx  App.tsx           # state: lang / theme / entered / flight replay; GSAP reveals
+│   ├── index.css                   # design tokens (dark+light), glass, buttons, marquee, range inputs
+│   ├── i18n.ts                     # FULL dictionary — en / ar / zh (every UI string)
+│   ├── components/
+│   │   ├── Nav.tsx                 # glass nav, language pill, theme toggle
+│   │   └── three/
+│   │       └── FlightPreloader.tsx # ★ Three.js globe + procedural SPEEDEX jet (see §5)
+│   └── sections/
+│       ├── Hero.tsx                # full-screen Doha, giant type, floating jet card, stats, marquee
+│       ├── Trade.tsx               # Beijing↔Doha compare slider, services, 5 checkpoints, Planner
+│       ├── Corporate.tsx           # BlueprintSVG + photo reveal, construction slider, structures
+│       └── Closing.tsx             # Why SPEEDEX, RFQ form (generates reference), footer
+└── nextjs-reference/
+    └── components/three/FlightPreloaderR3F.tsx   # ★ production Next.js/R3F version (see §4–§5)
+```
 
-## 3. Scroll choreography
+Run it:
 
-### Smooth
+```bash
+cd speedex
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # type-check (tsc -b) + production bundle → dist/
+```
 
-`Experience.tsx` creates Smooth on mount; there is no preloader or entry gate. Smooth uses native scrolling, while GSAP ticker calls `lenis.raf(...)` and `ScrollTrigger.update` runs on Smooth scroll. Anchor clicks are intercepted and routed through `lenis.scrollTo(..., { offset: -96 })` to respect the detached floating glass navigation pill.
+---
 
-### Hero canvas sequence
+## 4. Production target — Next.js architecture (App Router)
 
-`Hero.tsx` registers GSAP and `ScrollTrigger` in the browser effect. It does not render a `<video>`; the hero is a `h-screen w-screen` section containing a fullscreen canvas with `will-change: transform` / `transform-gpu`. `FRAME_COUNT` is 202 and `frameUrl(index)` resolves `frame-000.webp` through `frame-201.webp`. The first available image is decoded first so the scene can initialize without a percentage loader; 10 asynchronous workers then preload all remaining frames into memory. Canvas data attributes (`data-frame-count`, `data-loaded-frames`, `data-current-frame`, `data-target-frame`, `data-preload-complete`) make the state directly QA-verifiable. A hidden inline SVG in the same component defines `#speedex-ultimate-4k` (`feConvolveMatrix` `0 -1 0 -1 5 -1 0 -1 0` plus the supplied RGB transfer slopes); `.hero-canvas-sharp` applies it only to this canvas with `contrast(1.12) saturate(1.08)`, `-webkit-optimize-contrast` and `crisp-edges`. A colour-only filter declaration precedes the SVG form as a browser fallback.
+The prototype’s components port 1:1. Production adds locale routing, SSR/SEO and a real RFQ backend:
 
-A plain `{ frame }` proxy is tweened from 0 to 201 by GSAP with the pinned trigger: `start: "top top"`, `end: "+=3000"`, `scrub: true`, `pin: true`, `pinSpacing: true`, `anticipatePin: 1` and `invalidateOnRefresh: true`. Its `onUpdate` rounds and clamps the target index, then schedules at most one draw per animation frame. Drawing cover-crops the 1024×576 image to the canvas bitmap and caps DPR at 2. If the exact frame has not loaded, the nearest loaded frame is drawn instead, so the canvas never intentionally blanks. No React state changes during scroll. While ScrollTrigger is active, `html[data-hero-film="active"]` sets the detached floating header to `visibility: hidden; opacity: 0`, keeping the film completely unobstructed; after the range the canvas unpins into the marquee and `#gateway`.
+```
+speedex-web/                              # Next.js 14/15 · App Router · TypeScript
+├── app/
+│   ├── [locale]/                         # en | ar | zh  (next-intl, dir set per locale)
+│   │   ├── layout.tsx                    # fonts, ThemeProvider, <Nav/>, JSON-LD Organization
+│   │   ├── page.tsx                      # composes the story (Server Component shell)
+│   │   ├── trade/page.tsx                # phase-2 deep page: sourcing, QC, Incoterms, HS-code guide
+│   │   ├── setup/page.tsx                # phase-2 deep page: MOCI vs QFC vs QFZ, timelines, fees
+│   │   └── api/rfq/route.ts              # POST → validate (zod) → CRM + email + WhatsApp notify
+│   ├── sitemap.ts  robots.ts             # hreflang en/ar/zh alternates
+│   └── globals.css                       # ← port of src/index.css tokens
+├── components/
+│   ├── three/
+│   │   ├── FlightPreloader.tsx           # ← FlightPreloaderR3F.tsx (dynamic import, ssr:false)
+│   │   ├── SpeedexJet.tsx                # procedural now → /models/speedex-jet.glb later
+│   │   ├── Globe.tsx  RouteArc.tsx CityMarker.tsx
+│   │   └── BlueprintTower.tsx            # R3F version of Blueprint→Reality (see §6)
+│   ├── sections/  (Hero, Trade, Planner, Corporate, Why, QuoteForm, Footer)
+│   └── ui/        (GlassCard, MagneticButton, Marquee, CompareSlider, RangeField)
+├── lib/  gsap.ts · theme.ts · routes.ts (ROUTE coords) · pricing.ts (planner rules)
+├── messages/  en.json  ar.json  zh.json   # ← generated from src/i18n.ts keys
+└── public/  assets/ (images)  models/ (GLB, Draco+KTX2)  video/ (hero loop, poster fallbacks)
+```
 
-Under `prefers-reduced-motion`, the pin/scrub tween is not created; a mid-sequence frame is drawn as a still opening. The supplied source is 1024×576, and neither canvas nor WebP conversion can synthesize detail beyond that on a large fullscreen display.
+**Key production rules**
+1. **Never block first paint on WebGL.** `dynamic(() => import('.../FlightPreloader'), { ssr: false })`; the hero HTML renders underneath the curtain exactly as in the prototype.
+2. **GLB pipeline:** model livery in Blender (maroon tail/belly, SPEEDEX titles) → export GLB → `gltf-transform` (Draco geometry + KTX2 textures, target ≤ 1.2 MB) → `<useGLTF>` + `<Preload>`. Flight math is model-agnostic (nose = +Z convention).
+3. **i18n:** next-intl with `[locale]` segments; Arabic route serves `dir="rtl"` from the server (no post-hydration flip). All CSS uses logical properties from day one (already true in the prototype).
+4. **RFQ backend:** `POST /api/rfq` → zod validation → persist (Postgres/CRM) → notify (email + WhatsApp Business API) → return the same `SPX-2026-####-TRD|SET|ALL` reference the prototype generates, so UX doesn’t change.
+5. **CMS (optional phase 2):** Sanity/Contentful for route pages, case studies and the planner’s rate tables.
 
-### Gateway and consultancy overview
+### 4.1 Component tree (production page)
 
-`Hero.tsx` continues into `#gateway`, the first visible SPEEDEX statement after the cinematic pin. It carries the formal mission “Your trusted commercial gateway between Qatar and China” (AR: “بوابتك التجارية الموثوقة بين قطر والصين”), the operating promise, consultation/corporate-setup CTAs, the Qatar ↔ China bidirectional scope, Air · Sea · Land modes and the trilingual operating fact.
+```
+<LocaleLayout>
+└── <HomePage>
+    ├── <FlightPreloader onLanded>            (client, dynamic ssr:false)
+    │   └── <Canvas> <FlightScene> <Globe/> <RouteArc/> <SpeedexJet/> <CityMarker×2/> </FlightScene> + HUD overlay
+    ├── <Nav>  logo · links · <LocaleSwitch/> · <ThemeToggle/> · CTA
+    └── <main>
+        ├── <Hero>            giant type · jet card · stat glass · <Marquee/>
+        ├── <Trade>           <CompareSlider Beijing/Doha/> · services · 5 checkpoints
+        ├── <ShipmentPlanner> mode toggle · origin select · CBM/kg ranges · result tiles
+        ├── <CorporateSetup>  <BlueprintToReality/> (scrub + slider) · stages · structures
+        ├── <WhySpeedex>      logo story · 3 trust cards
+        └── <QuoteForm>       service select → /api/rfq → reference state
+    └── <Footer>
+```
 
-`ConsultancyOverview.tsx` follows with `#about` (three operating pillars: origin assurance, corridor logistics, and market establishment) and `#consultancy`. The five disciplines — Bilateral Sourcing & Logistics, Government Setup, Brand Creation, Office & Store Setup, Full Marketing & Operations — are staggered asymmetric `.swiss-node` glass shards/rows (`data-editorial-service`) with oversized outlined indices, capability traces, signal bars, GSAP-built data meters and pointer-tracked glare, followed by a clipped glass executive-action ribbon. Hover/focus feedback animates only transform, opacity and colours, is gated to fine pointers, and is disabled under reduced motion. Former service-cell CSS and markup have been removed.
+---
 
-### Strategic sections and architectural copy
+## 5. The 3D flight pre-loader — how it works
 
-`StrategicSections.tsx` adds four concise, fully localized chapters around the detailed films: `#why-choose-us` (reliability, 24/7 mediation, transparency and A–Z execution), `#china-gateway` (industrial sourcing, QC, consolidation/documentation and bilateral delivery), `#why-qatar` (Gulf access, Hamad air/sea infrastructure, business platforms and purchasing power), and `#company-setup-services`. The first three each use four staggered polygon-clipped glass nodes (`[data-strategy-node]`) in distinct asymmetric 12-column layouts (`[data-editorial-layout]`), with large outlined indices, animated meter traces, `[data-count]` numeric readouts, pointer glare and a centre rule. China Gateway adds a clipped glass corridor axis for the bidirectional Qatar ↔ China route. Company Setup Services uses four asymmetric clipped-glass annotation slots (`[data-company-setup-placeholder]`) whose specific service copy is intentionally blank for client input. Former strategy-cell/card systems have been removed.
+**Scene (both implementations share identical math):**
 
-Global `h1`–`h4` elements use uppercase/balanced architectural styling with tight tracking. The typographic system is **Syne** for Latin display/wordmark, **Cairo** for Arabic, **Inter** for Latin body copy and Noto Sans/Serif SC for Chinese support; narrow strategy/Why shards have separate Syne size guardrails so long display words are not clipped or split. `Experience.tsx` staggers sibling reveals, scrubs `[data-meter-fill]`, drifts oversized section numerals and slowly rotates `[data-orbit]` rings. It also animates each `[data-count]` readout once through a plain GSAP proxy — covering the four gateway telemetry counters and strategic-node meters — while reduced-motion renders final values immediately. On `(hover: hover) and (pointer: fine)` devices only, Swiss nodes receive pointer-tracked glare through `--pointer-x` / `--pointer-y`, and non-form glass/platform modules receive `rotationX`/`rotationY` tilt in CSS perspective; both reset on pointer leave and listeners are removed during effect cleanup. Motion remains transform/opacity-only and is disabled under reduced motion.
+1. **Globe** — dark maroon-tinted sphere (R = 2.25), 2,400-point Fibonacci dot-shell in muted gold (land-mass feel without a texture download), lat/long wireframe loops, gold back-side atmosphere halo, 900 stars, exponential fog.
+2. **Geography is real.** Beijing `39.9042°N, 116.4074°E` and Doha `25.2854°N, 51.5310°E` convert via the standard spherical mapping
+   `φ=(90−lat)`, `θ=(lon+180)` → `x=−r·sinφ·cosθ, y=r·cosφ, z=r·sinφ·sinθ`.
+   The world group is pre-rotated `rotation.y = −atan2(mid.x, mid.z)` so the route midpoint faces camera (+Z) — verified numerically; the great-arc is `lerp(start,end,t).normalize() × (R + sin(πt)·0.92)` giving a 0.92-unit cruise apex.
+3. **The jet is procedural** (no external model needed to ship): white capsule fuselage, maroon belly stripe, tail fin, stabiliser, wing tips and twin engines, steel intakes, dark cockpit + windows — and **“SPEEDEX · CHINA → QATAR” decals rendered to a `CanvasTexture`** on both fuselage sides. Nose = +Z; each frame the orientation basis is built from `forward = next − pos`, `up = normalize(pos)` (radial), `x = up × fwd`, `y = fwd × x` — so the jet banks naturally along the arc.
+4. **Timeline (≈6.4 s, skippable, `prefers-reduced-motion` → 1.6 s):** boarding pulse at Beijing → eased (`easeInOutCubic`) flight with a gold trail drawn by `setDrawRange`, pulsing city rings, HUD counting **km flown / 6,318 km** and **%** with phase captions (Boarding → Take-off → Cruising → Descent → Landed) in the active language → curtain translates −100% with a `cubic-bezier(.76,0,.24,1)` lift into the hero. Cursor movement parallaxes camera + globe tilt. Full dispose/cleanup on unmount.
 
-### Bilateral copy system and Insights
+**Performance budget:** 1 canvas, `dpr ≤ 2`, < 30 draw calls, no textures fetched (canvas-generated decal) → comfortably 60 fps on mid mobile; lazy-mount prevents it ever delaying LCP content.
 
-All website-controlled copy is standardized around **Qatar ↔ China**: EN “between Qatar and China”, AR “بين قطر والصين”, ZH “卡塔尔与中国之间”. Metadata, navigation, hero/gateway, trade captions, planner, RFQ, footer, alt text and visible photo credits use formal corporate-advisory terminology and national industrial/commercial-hub scope. Casual hooks, one-way positioning and capital-pair labels have been removed. The client-supplied hero frame artwork itself is unchanged and contains baked artwork in its final frames; replacing those pixels would be a separate asset-editing decision.
+---
 
-`components/Insights.tsx` renders `#insights` after Corporate Setup and before Why SPEEDEX. It contains one featured analysis plus three analytical briefings, localized in EN/AR/ZH: supplier qualification/manufacturing intelligence, Qatar import regulation, Qatar–China air–sea logistics optimization, and cross-border commercial mediation. The section is linked from the primary navigation and uses the architectural heading/subhead system, editorial borders and data markers (`data-insights-section`, `data-insight-article`).
+## 6. Blueprint → Reality (Corporate Setup)
 
-### Trade film
+- **Prototype (shipped):** an SVG “West Bay” blueprint (drawing no. `DWG-QA-001`) on blueprint-grid stock. Windows light floor-by-floor as *construction progress* rises; the real Doha skyline photograph is revealed upward via `clip-path: inset(100−p% 0 0 0)` under a glowing gold scanline. Driven three ways — **auto-plays once on scroll into view** (IntersectionObserver), **draggable slider**, and **▶ Replay**. The 5 legal/operational stages check off at 6/28/52/76/96%.
+- **Production upgrade path:** pin the section with GSAP ScrollTrigger `scrub` mapping scroll → the same `build` variable, and/or replace the SVG with an R3F tower (`BlueprintTower.tsx`: wireframe `EdgesGeometry` → solid materials + emissive windows lerped by `build`). The stage/checkpoint logic is unchanged.
 
-`TradeJourney.tsx` uses a 340–380svh wrapper with a CSS-sticky 100svh stage. CSS sticky was chosen instead of GSAP pinning because it remains stable with Smooth, RTL and mobile browser chrome.
+Note on content: MOCI Mainland / QFC / Free Zones cards are **positioning copy, not legal advice** — the prototype carries that disclaimer, and §9 flags legal review before launch.
 
-- Scroll progress maps the China industrial-network layer from 88% to 12% visibility. Visible captions and route graphics use national Qatar/China hub labels (`QAT ↔ CHN`), not a capital-city pair, airport codes, coordinates or a fixed capital distance.
-- A gold seam and circular handle track the split.
-- The four service phases change at quartiles of the journey.
-- Both photographs counter-parallax and scale subtly.
-- Pointer drag and keyboard arrows temporarily override scroll; a meaningful new scroll delta resumes scroll control.
-- In RTL the physical clip and pointer math mirror, so the China layer begins on the inline-start (right) side.
+---
 
-### Blueprint → Reality
+## 7. Interactive systems (prototype logic → production owner)
 
-Before the sticky film, the client-requested setup board is rendered as native responsive content rather than an embedded screenshot. It pairs a sharp clipped Blueprint/Reality architectural stage (the real Qatar corporate-skyline photograph revealed from the ground up over the SVG blueprint) with an open five-stage checklist on a glass control ribbon and three staggered MOCI/QFC/QFZ platform ribbons. All required board content and behaviour are retained. The board has an independent `boardBuild` state: an `IntersectionObserver` auto-plays it once when visible (or sets 100 under reduced motion), while its range slider and replay button provide direct control without being overwritten by the fullscreen film below.
+| System | Prototype behaviour | Productionise by |
+|---|---|---|
+| Beijing ↔ Doha compare | Pointer-drag + keyboard (←/→) divider, RTL-aware clip | Add pinch/scroll-linked variant on `/trade` page |
+| Shipment Planner | Sea: `CBM × origin rate + 650`; Air: chargeable kg = `max(kg, CBM×167)` × $4.9 + 380; ±(−15%/+20%) indicative band; transit windows & equipment (LCL/20ft/40ft/40HQ) per origin; animated fill meter | **Replace demo rates with SPEEDEX’s real rate card** in `lib/pricing.ts`; disclaimers already in UI in 3 languages |
+| RFQ form | Validates, returns `SPX-2026-####-{TRD,SET,ALL}` instantly | Wire to `/api/rfq` (+CRM/WhatsApp) keeping the same reference format |
+| Theme / language | `data-theme` on `<html>`, `dir` flip, persisted | Cookie-based in Next to avoid FOUC; locale from URL segment |
 
-`CorporateSetup.tsx` then uses the same sticky technique over 340–370svh for the immersive construction film.
+---
 
-- Scroll progress maps to `build: 0–100`.
-- The real daytime Qatar corporate-skyline photograph starts desaturated/dark and gains colour/brightness.
-- A blueprint-grid/SVG skyline overlay is clipped away from the bottom upward.
-- A gold scanline follows the construction frontier.
-- The setup board above is the single stage checklist; its five stages activate at 6/28/52/76/96%. The fullscreen film deliberately contains no duplicated floating stage list, aside or active-stage copy — only the image, percentage, scanline and bottom precision control.
-- The range input and replay button provide manual override; subsequent scroll movement returns control to the timeline.
+## 8. Assets & brand notes
 
-## 4. Opening sequence
+### 8.1 Logo observation (important)
+Your uploads contain **two different marks** above the globe: a **leaping gazelle** (realistic) and a **stylised lightning-bird**. The site standardises on the **gazelle over the globe** — it is distinctly Qatari (oryx/gazelle national symbolism), matches the aircraft livery intent, and carries the “speed” story in §5 of the page. Recommendation: retire the lightning-bird variant everywhere for one consistent identity.
 
-There is deliberately **no preloader UI**. The former dot-matrix globe/percentage Three.js intro, its component, replay controls, scroll lock and dependencies have been removed. The first meaningful paint is the canvas sequence itself. Frame loading happens asynchronously behind that first decoded frame, with a nearest-loaded fallback rather than a visible progress/percentage screen.
+### 8.2 Asset preparation done
+Originals are untouched in `uploads/`. Working copies in `speedex/public/assets/` were tight-cropped (jet card 1330×697, gazelle icon 432×442, wordmark 1008×287) and JPEG-optimised (~1.5 MB total). For production, supply/commission: transparent-background logo (SVG/PNG), the jet as a Blender GLB, and a 6–10 s hero video loop (Hamad Port cranes / HIA cargo) with poster fallback = the Doha aerial.
 
-## 5. Internationalisation and direction
+---
 
-`lib/i18n.ts` is currently a complete typed dictionary for English, Arabic and Chinese. `Experience.tsx` sets:
+## 9. Decisions needed from SPEEDEX before production launch
 
-- `document.documentElement.lang` (`en`, `ar`, or `zh-CN`)
-- `document.documentElement.dir` (`ltr` or `rtl`)
-- Tailwind logical utilities and CSS logical properties throughout
+1. **Real planner economics:** per-origin sea $/CBM, air $/kg tiers, minimums, and what the “indicative” band may legally promise.
+2. **Corporate-setup facts:** confirmed activities, timelines & government-fee ranges for MOCI / QFC / QFZ; legal sign-off of all setup copy.
+3. **Contact & conversion endpoints:** WhatsApp Business number, RFQ inbox/CRM, office address(es) in Doha & China, CR number for the footer.
+4. **Domain & analytics:** domain (e.g. speedex.qa), GA4/Matomo, consent approach for QA/CN audiences.
+5. **Asset rights:** confirm the AI-generated dioramas/jet imagery are cleared for commercial use, or schedule real photography.
 
-Arabic-specific protections include reduced kicker letter-spacing, mirrored clips/pointer calculations, reversed marquee direction and layout mirroring in navigation and forms.
+---
 
-Phase-2 SEO option: move the dictionary into locale route segments (`/en`, `/ar`, `/zh`) with `next-intl` if separate indexable URLs and hreflang output become a launch requirement. The present build deliberately keeps one canonical cinematic route and instant in-page language switching.
+## 10. QA checklist (prototype verified)
 
-## 6. Theme system
+- [x] `npm run build` — TypeScript strict + Vite production build pass
+- [x] Pre-loader: flight completes → curtain lift; **Skip** works; scroll locked until landing; replay from nav/footer
+- [x] Trilingual switch incl. full RTL mirror (nav, sliders, compare divider, marquee direction)
+- [x] Dark/light toggle across all sections (pre-loader intentionally stays cinematic-dark)
+- [x] Planner math updates live (mode, origin, CBM, kg → transit, range, equipment, chargeable weight)
+- [x] Blueprint auto-builds on scroll, slider overrides, replay restarts; stages check off
+- [x] RFQ form generates reference; keyboard-accessible compare slider; `prefers-reduced-motion` respected
+- [ ] Production-only: GLB jet swap, `/api/rfq`, locale routing + hreflang, legal/rate sign-off (§9)
 
-Themes are controlled by `data-theme="dark|light"` on `<html>`. A tiny inline script in `app/layout.tsx` applies the stored preference before first paint to avoid a flash.
-
-- Dark: `#070709` core field, `#140A0F` maroon-tinted field, luxury burgundy `#6B1D2F`, champagne gold `#C5A059`, ivory type
-- Light: warm ivory paper, deep maroon ink
-- Photo chapters remain dark in both modes for photographic continuity
-- Header/footer/manifesto/editorial reading surfaces follow the selected theme; the only Day/Night toggle is footer-hosted as `[data-footer-theme-control]`, keeping the header composition clean
-
-## 7. Vector brand system
-
-The old 3D raster mark could not be traced naïvely: its extrusion merged into a blobby silhouette. The final process was:
-
-1. Isolate the bright planar front face from the supplied transparent logo extraction with a luminance mask.
-2. Remove fragments and smooth the mask at high resolution.
-3. Simplify the contour and convert it to hand-smoothed Bézier curves.
-4. Redraw the globe geometrically with ellipses, latitude paths and a clip path.
-5. Render as an inline React SVG using `currentColor`.
-
-Outputs:
-
-- `components/SpeedexMark.tsx` — theme-aware header mark
-- `public/assets/speedex-mark.svg` — maroon standalone/favicon source
-- `public/assets/speedex-mark-white.svg` — white standalone
-
-The wordmark is live **Syne** typography, not an image. No other logo image is used on the page; the footer repeats only the SPEEDEX name in text and hosts the sole Day/Night theme control. In `Nav.tsx`, the crisp vector is presented as a four-layer pseudo-3D maroon emblem: deep extrusion, `#6B1D2F` mid-depth, theme-aware front face and a restrained highlight, transformed in CSS perspective. The outer `[data-clean-header]` is pointer-transparent except for its detached `[data-floating-nav]` pill and floating mobile panel. The pill contains the logo, six unnumbered links, the EN/عربي/中文 switcher and one mandate CTA; it uses a 999px radius with backdrop blur/saturation and stays hidden while the hero film is active. The primary links are `#trade`, `#planner`, `#setup`, `#china-gateway`, `#why-qatar` and `#insights` (the China navigation label is shortened to “China Gateway” / “بوابة الصين” / “中国门户”, while the section title remains “China Gateway & Why China”). The executive CTA uses localized `nav_cta` copy (`Initiate Mandate` / `طلب تفويض مؤسسي` / `发起企业委托`) with `bg-[#6B1D2F] text-white rounded-full px-5 py-2` plus `.btn-executive`; browser QA computes `background-color: rgb(107, 29, 47)`, white text, a 999px radius and zero header theme toggles.
-
-## 8. Interactive business logic
-
-### Bidirectional Logistics Planner
-
-`Planner.tsx` exposes an explicit trade-direction control (`cn-qa` / `qa-cn`) with localized labels. China → Qatar uses Ningbo, Shanghai, Guangzhou, Shenzhen and Yiwu origins; Qatar → China uses Hamad Port, Hamad International Airport, Mesaieed Industrial City and Ras Laffan Industrial City. The destination output is expressed as national commercial/industrial hubs rather than one destination city. Current indicative rules:
-
-- Sea: `max(CBM, 1) × origin rate + 650`
-- Origin sea rates: Ningbo 385, Shanghai 390, Guangzhou 365, Shenzhen 365, Yiwu 405; Hamad Port 410, Hamad International Airport 425, Mesaieed 415, Ras Laffan 430
-- Air chargeable weight: `max(kg, round(CBM × 167))`
-- Air: `chargeable × 4.9 + 380`
-- Display band: −15% / +20%
-- Equipment: LCL ≤10 CBM; 20ft ≤28; 40ft ≤58; otherwise 40HQ/multiple
-
-The controls and results sit on offset `.glass-ribbon-dark` sheets so white type retains contrast over the photographic chapter in both themes. Load bars have fixed layout heights and use baseline `scaleY` transforms when active. `[data-container-simulator]` mirrors the selected volume as a 12-cell, transform-scaled gradient fill with a live percentage, RTL-aware transform origin and `40HQ envelope` (sea) / `ULD envelope` (air) labelling. These values must be replaced by an approved SPEEDEX rate card for both directions before commercial launch.
-
-### RFQ
-
-The RFQ is a client-side reference generator with formats:
-
-- `SPX-2026-####-TRD`
-- `SPX-2026-####-SET`
-- `SPX-2026-####-ALL`
-
-Recommended production endpoint contract: `POST /api/rfq` → schema validation → CRM/email/WhatsApp notification → return the same reference format so the existing UI state can remain unchanged.
-
-## 9. Responsive strategy
-
-Latest emergency anti-template verification viewports:
-
-- 1440 × 1000 desktop (English, dark and light themes)
-- 390 × 844 mobile (Arabic RTL)
-- Canonical port 3000 and refreshed static port 4174 both pass the same 27-check Puppeteer suite with `ERRORS []`: unobstructed 202-frame forward/reverse hero scrub, exact clean-header composition, computed Syne/Cairo/Inter typography, polygon-clipped blurred gradient glass surfaces, pointer glare, telemetry `2/3/5/24`, first China node `94`, live container-fill transform, `matrix3d` glass tilt/reset, footer-only theme cycling, setup board and Arabic RTL mobile menu; evidence: `/home/user/SPEEDEX-Emergency-AntiTemplate-Overhaul-QA.jpg`
-
-Sticky scenes use `svh`; type uses `clamp()`; captions have separate mobile widths; the fullscreen corporate film remains clean and list-free at every breakpoint; forms and editorial rows stack without horizontal overflow. Desktop interaction QA also checks `documentElement.scrollWidth <= innerWidth` at hero, trade, planner, corporate and RFQ positions.
-
-## 10. Security and dependency posture
-
-- Next is pinned to the patched 15.5.28 backport.
-- An npm override pins PostCSS to 8.5.31 because Next’s bundled transitive version lagged current advisories at handover.
-- `npm audit` reported zero known vulnerabilities after the final install.
-- No secrets, API keys or server actions are present in this front-end build.
-
-## 11. Launch checklist
-
-- [ ] Set production domain and `metadataBase`
-- [ ] Connect RFQ backend and test deliverability
-- [ ] Replace planner demo rates and approve wording
-- [ ] Obtain legal review of MOCI/QFC/QFZ claims, timelines and fees
-- [ ] Add official contact details, WhatsApp number, address and CR details if desired
-- [ ] Confirm photographic and architectural-work rights for Qatar commercial use
-- [ ] Decide whether locale-specific URLs/hreflang are required for SEO
-- [ ] Add analytics/consent according to launch markets
+*Built as a working prototype on React + Three.js + GSAP + Tailwind (Vite harness for instant preview); the component and scene code is structured to lift directly into the Next.js App Router target in §4.*
